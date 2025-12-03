@@ -415,6 +415,8 @@ unzip -p macOS_13.6.ipsw BuildManifest.plist > BuildManifest.plist
 ---
 
 
+
+
 graph TD
     subgraph "רשת מבודדת (Air-Gapped Network)"
         style internalNet fill:#e1f5fe,stroke:#01579b,stroke-width:2px
