@@ -413,3 +413,84 @@ unzip -p macOS_13.6.ipsw BuildManifest.plist > BuildManifest.plist
 - ⚠️ לא מתאים לעדכונים ספונטניים - דורש תיאום מראש
 
 ---
+
+
+graph TD
+    subgraph "רשת מבודדת (Air-Gapped Network)"
+        style internalNet fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+        internalNet["רשת פנימית - ללא גישה לאינטרנט"]
+
+        clientMac["Client Mac (Apple Silicon)
+        IP: 192.168.1.x
+        OS: macOS 12+"]
+
+        subgraph "שרת פנימי (Internal Server) - 192.168.1.10"
+            style internalServer fill:#b3e5fc,stroke:#0288d1,stroke-width:2px
+            proxyServer["Proxy Server
+            (Python/Flask)
+            Port: 443"]
+            reposadoServer["Reposado Server
+            (תוכן העדכון)
+            Port: 8088"]
+            
+            subgraph "אחסון פרוקסי"
+                style proxyStorage fill:#81d4fa,stroke:#039be5,stroke-width:1px
+                ticketCache["Ticket Cache
+                (כרטיסים חתומים)"]
+                pendingQueue["Pending Queue
+                (בקשות ממתינות)"]
+            end
+        end
+
+        clientMac -- "בקשת TSS (HTTPS)" --> proxyServer
+        proxyServer -- "תגובת TSS (כרטיס)" --> clientMac
+        clientMac -- "הורדת תוכן (HTTP)" --> reposadoServer
+        proxyServer -- "בדיקה/שמירה" --> ticketCache
+        proxyServer -- "שמירה" --> pendingQueue
+    end
+
+    subgraph "רשת חיצונית (Internet Network)"
+        style externalNet fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+        externalNet["רשת מחוברת לאינטרנט"]
+
+        subgraph "מערכת חתימה חיצונית (External Signer System)"
+            style externalSigner fill:#ffcc80,stroke:#fb8c00,stroke-width:2px
+            signerScript["Signer Script
+            (Python/tsschecker)"]
+            buildManifest["BuildManifest.plist
+            (מתוך IPSW)"]
+        end
+
+        appleTSS["Apple TSS
+        (gs.apple.com)"]
+
+        signerScript -- "בקשת חתימה" --> appleTSS
+        appleTSS -- "כרטיס חתום" --> signerScript
+        buildManifest -- "שימוש ב-Hashes" --> signerScript
+    end
+
+    subgraph "העברה פיזית (Sneakernet)"
+        style usbTransfer fill:#e0e0e0,stroke:#616161,stroke-width:2px,stroke-dasharray: 5 5
+        usbDrive["כונן USB
+        (העברה ידנית)"]
+    end
+
+    pendingQueue -.-> usbDrive
+    usbDrive -.-> signerScript
+    signerScript -.-> usbDrive
+    usbDrive -.-> ticketCache
+
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef network fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef server fill:#b3e5fc,stroke:#0288d1,stroke-width:2px;
+    classDef storage fill:#81d4fa,stroke:#039be5,stroke-width:1px;
+    classDef external fill:#ffe0b2,stroke:#e65100,stroke-width:2px;
+    classDef signer fill:#ffcc80,stroke:#fb8c00,stroke-width:2px;
+    classDef usb fill:#e0e0e0,stroke:#616161,stroke-width:2px,stroke-dasharray: 5 5;
+
+    class internalNet,clientMac network;
+    class internalServer,proxyServer,reposadoServer server;
+    class proxyStorage,ticketCache,pendingQueue storage;
+    class externalNet,appleTSS external;
+    class externalSigner,signerScript,buildManifest signer;
+    class usbTransfer,usbDrive usb;
